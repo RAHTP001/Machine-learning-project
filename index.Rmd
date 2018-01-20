@@ -1,0 +1,169 @@
+---
+title: "index"
+author: "RAHTP001"
+date: "20 January 2018"
+output: 
+  html_document: 
+    keep_md: yes
+---
+
+#Goal
+The Goal of this project is to build a machine Learning algorithm which can correctly identify the quality of barbell bicep curls by using data from belt, forearm, arm, and dumbbell monitors. goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+#Data
+The training data for this project are available here:
+
+[https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv]
+
+The training data for this project are available here:
+
+[https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv]
+
+#Getting Data
+
+```{r,cache=TRUE,results='hide'}
+getwd()
+library("caret")
+library("rattle")
+library("rpart.plot")
+library("rpart")
+set.seed(54321)
+
+
+TrainUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+        Training<- "training.csv"
+        download.file(TrainUrl,Training)
+        Training<-read.csv(Training,header = T,stringsAsFactors =TRUE)
+        
+TestUrl  <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+Testing<- "testing.csv"
+download.file(TestUrl,Testing)
+Testing<-read.csv(Testing, header = T,stringsAsFactors =TRUE)
+```
+File downloaded In local disk.
+
+```{r,results='hide'}
+head(Training);head(Testing)
+```
+
+As I have't showed result of "head" in this file but Both created datasets have 160 variables in this this data set and there are lot of NA's.we will ger rid of these NA valus step by step.
+1) Removing veriable with Nearly Zero Variance
+
+```{r,cache=TRUE}
+NZV <- nearZeroVar(Training)
+Training1 <- Training[, -NZV]
+Testing1 <- Testing[, -NZV]
+
+dim(Training1)
+dim(Testing1)
+```
+Now veriable reduces to 100 in each set
+
+2)removing NA's
+
+```{r,cache=TRUE}
+RemoveNA <- sapply(Testing1,function(x)mean(is.na(x))) > 0.95
+Testing2  <- Testing1[, RemoveNA==FALSE]
+Training2<- Training1[, RemoveNA==FALSE]
+
+
+dim(Training2)
+dim(Testing2)
+
+```
+After removing NA veriable size reduce to 59
+
+
+coloumn 1:5 are identification veriable we dont need them for further analysis as they wont help much in analysis
+
+```{r,cache=TRUE}
+Training3 <- Training2[, -(1:5)]
+Testing3  <- Testing2[, -(1:5)]
+
+dim(Training3)
+dim(Testing3)
+```
+
+#Partitioning Data sets in to two for further analysis and Loading require packages.
+```{r,cache=TRUE}
+inTrain  <- createDataPartition(Training3$classe, p=0.7, list=FALSE)
+TrainSet <- Training3[inTrain, ]
+TestSet  <- Training3[-inTrain, ]
+
+```
+
+Lets check dimention and other attibutes of data set
+
+```{r,cache=TRUE}
+dim(TrainSet);dim(TestSet)
+```
+
+Two methods will be applied to model the regressions (in the Train dataset) in this report and the best one (with higher accuracy when applied to the Test dataset) will be used for the quiz predictions. The methods are: Random Forests, Comformation Tree.
+ 
+#Method conformation Tree
+
+```{r,cache=TRUE}
+modelFitCT<-rpart(classe ~.,method="class", data=TrainSet)
+prp(modelFitCT)
+```
+
+#Model Prediction with conformation Tree
+
+```{r,cache=TRUE}
+predictionCT<-predict(modelFitCT,newdata=TestSet,type = "class")
+
+conformationCT<-confusionMatrix(predictionCT, TestSet$classe)
+
+print(conformationCT)
+
+```
+
+```{r}
+accuracyCT<-postResample(predictionCT,TestSet$classe)
+accuracyCT
+```
+Overall Statistical Accuracy of Model Decicision Tree is = 0.8005. which is not bad actually but before taking any decision we will check Regression model with another Method.
+
+Now We will check with another method "Random Forest"
+
+#Method Random Forest
+
+```{r,cache=TRUE,echo=FALSE,results='hold'}
+library(randomForest)
+
+controlRF <- trainControl(method="cv", number=4, verboseIter=FALSE)
+modelFitRF<-randomForest(classe ~.,data=TrainSet,method="rf",trControl=controlRF)
+```
+
+# Model prediction with Random Forest
+
+```{r,cache=TRUE}
+predictionRF <- predict(modelFitRF,TestSet, type = "class")
+conformationRF<- confusionMatrix(predictionRF, TestSet$classe)
+print(conformationRF)
+plot(modelFitRF)
+```
+
+```{r}
+accuracyRF <- postResample(predictionRF, TestSet$classe)
+accuracyRF
+```
+
+
+Overall Statistical Accuracy of Model Decicision Tree is = 0.9976
+Random Forests yielded better Results, as expected
+
+#Testing Out-of-sample error
+From above examples Method desicion Tree is about 0.800 Vs method Random Forest is about 0.998 accurate.which means method Random forest Is more accurate to predict result.
+```{r,cache=TRUE}
+sampleError<-1-accuracyRF[1]
+print(sampleError)
+```
+
+
+```{r,cache=TRUE}
+ PredictAnswer <- predict(modelFitRF,Testing)
+ PredictAnswer
+```
+
+  
